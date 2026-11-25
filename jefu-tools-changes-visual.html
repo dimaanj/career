@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Агентный флоу: было → стало</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171e2e; --panel2: #1e2739; --line: #33405a;
+    --text: #e6eaf2; --muted: #9aa6bd; --accent: #6aa8ff; --green: #5fd3a0;
+    --amber: #f2b45a; --violet: #b18cff; --red: #ff7a7a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 20px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  .slide { display: none; position: absolute; inset: 0; padding: 40px 64px 56px; overflow: auto; }
+  .slide.active { display: flex; flex-direction: column; }
+  h1 { font-size: 46px; margin: 0 0 12px; letter-spacing: -0.5px; line-height: 1.12; }
+  h2 { font-size: 32px; margin: 0 0 6px; letter-spacing: -0.3px; line-height: 1.2; }
+  .sub { color: var(--muted); margin: 0 0 18px; font-size: 19px; }
+  .kicker { color: var(--accent); text-transform: uppercase; font-size: 14px; letter-spacing: 2px; margin-bottom: 6px; }
+  code, .mono { font-family: "SF Mono", Menlo, monospace; }
+  code { font-size: 15px; background: var(--panel2); padding: 1px 6px; border-radius: 5px; color: #cfe0ff; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; min-height: 0; }
+  .c3 { grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .c4 { grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; }
+  .roomy .card { padding: 26px 28px; }
+  .roomy .card h3 { font-size: 26px; margin-bottom: 12px; }
+  .roomy .card p { font-size: 21px; line-height: 1.45; }
+  .card h3 { margin: 0 0 6px; font-size: 19px; }
+  .big { font-size: 40px; font-weight: 700; letter-spacing: -1px; line-height: 1.05; }
+  ul { margin: 4px 0; padding-left: 20px; } li { margin: 3px 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: 16px; line-height: 1.4; }
+  .xs { font-size: 14px; line-height: 1.35; }
+  table { border-collapse: collapse; width: 100%; font-size: 17px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; }
+  .g { color: var(--green); } .a { color: var(--amber); } .v { color: var(--violet); } .b { color: var(--accent); } .r { color: var(--red); }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; fill: var(--text); }
+  svg .m { fill: var(--muted); font-size: 13px; }
+  svg .mono { font-family: "SF Mono", Menlo, monospace; }
+  .nav { position: fixed; bottom: 14px; right: 24px; color: var(--muted); font-size: 15px; user-select: none; }
+  .nav button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 4px 12px; font-size: 16px; cursor: pointer; margin-left: 6px; }
+  .progress { position: fixed; left: 0; bottom: 0; height: 4px; background: var(--accent); transition: width .2s; }
+  .center { margin: auto 0; }
+  body { background: radial-gradient(1200px 600px at 85% -10%, #1b2a4a 0%, var(--bg) 60%); }
+  h1 { background: linear-gradient(90deg, #cfe0ff, var(--accent) 45%, var(--green)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .slide.active > *, .slide.active .center > * { animation: rise .5s cubic-bezier(.2,.7,.2,1) both; }
+  .slide.active > *:nth-child(2), .slide.active .center > *:nth-child(2) { animation-delay: .06s; }
+  .slide.active > *:nth-child(3), .slide.active .center > *:nth-child(3) { animation-delay: .12s; }
+  .slide.active > *:nth-child(4), .slide.active .center > *:nth-child(4) { animation-delay: .18s; }
+  .slide.active > *:nth-child(n+5), .slide.active .center > *:nth-child(n+5) { animation-delay: .24s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+  @keyframes dash { to { stroke-dashoffset: -26; } }
+  @keyframes grow { from { transform: scaleX(0); } to { transform: none; } }
+  @keyframes glow { 0%, 100% { filter: drop-shadow(0 0 0 rgba(95,211,160,0)); } 50% { filter: drop-shadow(0 0 7px rgba(95,211,160,.55)); } }
+  .card { transition: transform .2s, border-color .2s, box-shadow .2s; }
+  .card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 8px 24px rgba(106,168,255,.12); }
+  .slide.active svg g rect { transform-box: fill-box; transform-origin: center; animation: pop .45s both; }
+  .slide.active svg g rect:nth-of-type(1) { animation-delay: .15s; } .slide.active svg g rect:nth-of-type(2) { animation-delay: .25s; }
+  .slide.active svg g rect:nth-of-type(3) { animation-delay: .35s; } .slide.active svg g rect:nth-of-type(4) { animation-delay: .45s; }
+  .slide.active svg g rect:nth-of-type(5) { animation-delay: .55s; } .slide.active svg g rect:nth-of-type(6) { animation-delay: .65s; }
+  .slide.active svg g rect:nth-of-type(7) { animation-delay: .75s; } .slide.active svg g rect:nth-of-type(8) { animation-delay: .85s; }
+  .slide.active svg g rect:nth-of-type(n+9) { animation-delay: .95s; }
+  .slide.active svg rect.new { animation: pop .45s both, glow 2.4s 1.2s ease-in-out infinite; }
+  .flowdash { stroke-dasharray: 7 6; animation: dash 1.1s linear infinite; }
+  .term { background: #0a0f1a; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .term .bar { background: #151c2b; padding: 7px 14px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .term .bar i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; background: #ff7a7a; }
+  .term .bar i:nth-child(2) { background: #f2b45a; } .term .bar i:nth-child(3) { background: #5fd3a0; }
+  .term pre { margin: 0; padding: 12px 16px; font: 14px/1.55 "SF Mono", Menlo, monospace; color: #cfe0ff; white-space: pre-wrap; }
+  .term .ok { color: var(--green); } .term .bad { color: var(--red); } .term .dim { color: var(--muted); }
+
+  .chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    letter-spacing: .3px; border: 1px solid; white-space: nowrap; vertical-align: middle; }
+  .chip.ok { color: var(--green); border-color: rgba(95,211,160,.5); background: rgba(95,211,160,.12); }
+  .chip.part { color: var(--amber); border-color: rgba(242,180,90,.5); background: rgba(242,180,90,.12); }
+  .chip.next { color: var(--violet); border-color: rgba(177,140,255,.5); background: rgba(177,140,255,.12); }
+  .chip.bad { color: var(--red); border-color: rgba(255,122,122,.5); background: rgba(255,122,122,.12); }
+  .chip.old { color: var(--muted); border-color: #4a5876; background: rgba(154,166,189,.08); }
+  .chip.info { color: var(--accent); border-color: rgba(106,168,255,.5); background: rgba(106,168,255,.12); }
+  .legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 15px; color: var(--muted); }
+
+  .stat { text-align: left; }
+  .stat .big { margin-bottom: 4px; }
+  .stat .lbl { color: var(--muted); font-size: 15px; line-height: 1.3; }
+
+  .holes { display: grid; grid-template-columns: 1.15fr 34px 1.2fr 122px; gap: 4px 10px; align-items: stretch; }
+  .holes .h { background: rgba(255,122,122,.07); border: 1px solid rgba(255,122,122,.35); border-left: 4px solid var(--red);
+    border-radius: 10px; padding: 3px 12px; }
+  .holes .f { background: rgba(95,211,160,.07); border: 1px solid rgba(95,211,160,.35); border-left: 4px solid var(--green);
+    border-radius: 10px; padding: 3px 12px; }
+  .holes .f.p { background: rgba(242,180,90,.07); border-color: rgba(242,180,90,.35); border-left-color: var(--amber); }
+  .holes .t { font-size: 15.5px; font-weight: 600; line-height: 1.2; }
+  .holes .d { font-size: 13px; color: var(--muted); line-height: 1.3; }
+  .holes .ar { display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 22px; }
+  .holes .st { display: flex; align-items: center; }
+  .slide.active .holes > * { animation: rise .45s both; }
+  .slide.active .holes > *:nth-child(n+5) { animation-delay: .1s; } .slide.active .holes > *:nth-child(n+9) { animation-delay: .18s; }
+  .slide.active .holes > *:nth-child(n+13) { animation-delay: .26s; } .slide.active .holes > *:nth-child(n+17) { animation-delay: .34s; }
+  .slide.active .holes > *:nth-child(n+21) { animation-delay: .42s; } .slide.active .holes > *:nth-child(n+25) { animation-delay: .5s; }
+  .slide.active .holes > *:nth-child(n+29) { animation-delay: .58s; } .slide.active .holes > *:nth-child(n+33) { animation-delay: .66s; }
+
+  .perm td.y, .perm td.n, .perm td.p { text-align: center; }
+  .dot { display: inline-block; width: 16px; height: 16px; border-radius: 50%; vertical-align: middle; }
+  .dot.y { background: var(--green); box-shadow: 0 0 10px rgba(95,211,160,.5); }
+  .dot.n { border: 2px solid var(--red); background: transparent; position: relative; }
+  .dot.n::after { content: ""; position: absolute; left: 5px; top: -2px; width: 2px; height: 16px; background: var(--red); transform: rotate(45deg); }
+  .dot.p { background: var(--amber); }
+  .perm .note { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .gate h3 { display: flex; justify-content: space-between; align-items: center; }
+  .gate dl { margin: 0; display: grid; grid-template-columns: 92px 1fr; gap: 4px 10px; font-size: 15px; line-height: 1.35; }
+  .gate dt { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; padding-top: 2px; }
+  .gate dd { margin: 0; }
+
+  .files { display: grid; grid-template-columns: 1fr 1.25fr; gap: 26px; }
+  .frow { display: grid; grid-template-columns: 26px 1fr 66px; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px dashed #27324a; }
+  .frow .n { font: 14px "SF Mono", Menlo, monospace; color: #cfe0ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .frow .n small { display: block; color: var(--muted); font-size: 11.5px; white-space: normal; }
+  .frow .k { font: 700 12px "SF Mono", Menlo, monospace; text-align: center; border-radius: 5px; padding: 1px 0; }
+  .frow .k.A { color: var(--green); background: rgba(95,211,160,.14); } .frow .k.M { color: var(--amber); background: rgba(242,180,90,.14); }
+  .frow .c { font: 13px "SF Mono", Menlo, monospace; text-align: right; }
+  .bar2 { height: 7px; border-radius: 4px; background: linear-gradient(90deg, var(--green), #3fa77c); margin-top: 3px; transform-origin: left; }
+  .bar2.m { background: linear-gradient(90deg, var(--amber), #c98a35); }
+  .slide.active .bar2 { animation: grow .8s .2s cubic-bezier(.2,.7,.2,1) both; }
+  .fhead { font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent); margin: 8px 0 2px; }
+  .gl { display: inline-block; font: 600 11px "SF Mono", Menlo, monospace; color: var(--muted); border: 1px solid #3a4763;
+    border-radius: 6px; padding: 0 5px; margin-left: 6px; vertical-align: 2px; letter-spacing: 0; text-transform: none; }
+</style>
+</head>
+<body>
+
+<!-- 1. Титул -->
+<section class="slide">
+  <div class="center">
+    <div class="kicker">jefu-tools · что меняется</div>
+    <h1>Было → стало: что добавляет агентный флоу</h1>
+    <p class="sub">Тот же путь задачи, но с проверками и учётом на каждом шаге.</p>
+  </div>
+</section>
+
+<!-- 2. Карта было / стало -->
+<section class="slide">
+  <div class="kicker">Карта</div>
+  <h2>Рядом с backend появился такой же контур для веб-приложений</h2>
+  <div class="legend" style="margin: 6px 0 14px;">
+    <span class="chip old">было</span><span class="chip ok">новое</span><span class="chip part">расширено</span>
+  </div>
+  <svg viewBox="0 0 1220 310">
+    <g class="m">
+      <text x="150" y="16" class="m" font-size="13">ВХОД</text><text x="367" y="16" class="m" font-size="13">ИСПОЛНИТЕЛИ</text>
+      <text x="584" y="16" class="m" font-size="13">ПРОВЕРКИ</text><text x="801" y="16" class="m" font-size="13">РЕВЬЮ</text>
+      <text x="1018" y="16" class="m" font-size="13">УЧЁТ</text>
+    </g>
+    <text x="0" y="60" font-size="16" font-weight="700" fill="#9aa6bd">Было</text><text x="0" y="80" class="m">backend</text>
+    <g>
+      <rect x="150" y="30" width="202" height="56" rx="10" fill="#1a2030" stroke="#4a5876"/>
+      <rect x="367" y="30" width="202" height="56" rx="10" fill="#1a2030" stroke="#4a5876"/>
+      <rect x="584" y="30" width="202" height="56" rx="10" fill="#1a2030" stroke="#4a5876"/>
+      <rect x="801" y="30" width="202" height="56" rx="10" fill="#1a2030" stroke="#4a5876"/>
+      <rect x="1018" y="30" width="202" height="56" rx="10" fill="#1a2030" stroke="#4a5876"/>
+    </g>
+    <g font-size="15" fill="#c3cbdb" text-anchor="middle">
+      <text x="251" y="63" fill="#c3cbdb">Оркестратор backend</text><text x="468" y="63" fill="#c3cbdb">Java-исполнители</text>
+      <text x="685" y="63" fill="#c3cbdb">Сборка и тесты</text><text x="902" y="63" fill="#c3cbdb">Ревью PR</text>
+      <text x="1119" y="63" fill="#c3cbdb">Аудит сессии</text>
+    </g>
+    <rect x="150" y="100" width="1070" height="34" rx="8" fill="rgba(255,122,122,.06)" stroke="#ff7a7a" stroke-dasharray="6 5"/>
+    <text x="685" y="122" text-anchor="middle" font-size="14" fill="#ff9c9c">Раньше веб-приложения и их серверы были вне зоны агентов</text>
+    <text x="0" y="180" font-size="16" font-weight="700" fill="#5fd3a0">Стало</text><text x="0" y="200" class="m">веб-приложения</text><text x="0" y="218" class="m">и их серверы</text>
+    <g>
+      <rect class="new" x="150" y="150" width="202" height="56" rx="10" fill="#17332b" stroke="#5fd3a0" stroke-width="2"/>
+      <rect class="new" x="367" y="150" width="202" height="56" rx="10" fill="#17332b" stroke="#5fd3a0" stroke-width="2"/>
+      <rect class="new" x="584" y="150" width="202" height="56" rx="10" fill="#17332b" stroke="#5fd3a0" stroke-width="2"/>
+      <rect x="801" y="150" width="202" height="56" rx="10" fill="#2e2618" stroke="#f2b45a" stroke-width="2"/>
+      <rect x="1018" y="150" width="202" height="56" rx="10" fill="#2e2618" stroke="#f2b45a" stroke-width="2"/>
+    </g>
+    <g font-size="15" font-weight="600" text-anchor="middle">
+      <text x="251" y="174">Свой оркестратор</text><text x="468" y="174">2 исполнителя</text>
+      <text x="685" y="174">3 проверки</text><text x="902" y="174">Ревью + верификатор</text>
+      <text x="1119" y="174">Бюджет задачи</text>
+    </g>
+    <g font-size="12" class="m" text-anchor="middle">
+      <text x="251" y="194" class="m">fe-orchestrator</text><text x="468" y="194" class="m">fe-react · fe-nestjs-bff</text>
+      <text x="685" y="194" class="m">quality · contract · security</text><text x="902" y="194" class="m">fe-reviewer</text>
+      <text x="1119" y="194" class="m">cost-budget</text>
+    </g>
+    <g stroke="#6f7f9e" stroke-width="2" fill="none">
+      <line x1="352" y1="178" x2="367" y2="178"/><line x1="569" y1="178" x2="584" y2="178"/>
+      <line x1="786" y1="178" x2="801" y2="178"/><line x1="1003" y1="178" x2="1018" y2="178"/>
+    </g>
+    <g>
+      <rect x="150" y="234" width="1070" height="62" rx="10" fill="#1e2739" stroke="#4a5876"/>
+    </g>
+    <text x="170" y="260" font-size="15" font-weight="600" fill="#c3cbdb">Общий фундамент переиспользован, а не скопирован</text>
+    <text x="170" y="282" class="m">договор агентов · handoff · маркеры [STATE] · журнал аудита · ретро и бэклог · работа с ветками</text>
+  </svg>
+  <ul class="xs muted" style="margin: 6px 0 0; padding-left: 18px;">
+    <li>Агенты <code>jefu-smn-fe-*</code><span class="gl">§1</span> ведут и правят; гейты<span class="gl">§12</span> и бюджет<span class="gl">§30</span> — навыки-скрипты<span class="gl">§3</span> в <code>copilot/skills</code>. <code>fe-reviewer</code> только читает дифф. § — разделы <code>ai-glossary.md</code>.</li>
+  </ul>
+</section>
+
+<!-- 3. Слои и журнал -->
+<section class="slide">
+  <div class="kicker">Как устроено</div>
+  <h2>Каждый шаг оставляет след в журнале аудита</h2>
+  <p class="sub">Из журнала видно стоимость, качество ревью и где процесс сбоит.</p>
+  <svg viewBox="0 0 1220 340">
+    <defs><marker id="ar4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6f7f9e"/></marker></defs>
+    <g>
+      <rect x="0" y="0" width="224" height="220" rx="14" fill="#151c2b" stroke="#6aa8ff"/>
+      <rect x="249" y="0" width="224" height="220" rx="14" fill="#151c2b" stroke="#5fd3a0"/>
+      <rect x="498" y="0" width="224" height="220" rx="14" fill="#151c2b" stroke="#5fd3a0"/>
+      <rect x="747" y="0" width="224" height="220" rx="14" fill="#151c2b" stroke="#f2b45a"/>
+      <rect x="996" y="0" width="224" height="220" rx="14" fill="#151c2b" stroke="#b18cff"/>
+    </g>
+    <g font-size="17" font-weight="700">
+      <text x="16" y="30" fill="#6aa8ff">1 · Вход</text><text x="265" y="30" fill="#5fd3a0">2 · Исполнители</text>
+      <text x="514" y="30" fill="#5fd3a0">3 · Проверки</text><text x="763" y="30" fill="#f2b45a">4 · Ревью</text>
+      <text x="1012" y="30" fill="#b18cff">5 · Сдача</text>
+    </g>
+    <g>
+      <rect x="14" y="46" width="196" height="40" rx="8" fill="#1e2739" stroke="#33405a"/>
+      <rect x="14" y="94" width="196" height="40" rx="8" fill="#1e2739" stroke="#33405a"/>
+      <rect x="14" y="142" width="196" height="40" rx="8" fill="#2a2440" stroke="#b18cff"/>
+      <rect x="263" y="46" width="196" height="40" rx="8" fill="#17332b" stroke="#5fd3a0"/>
+      <rect x="263" y="94" width="196" height="40" rx="8" fill="#17332b" stroke="#5fd3a0"/>
+      <rect x="512" y="46" width="196" height="40" rx="8" fill="#17332b" stroke="#5fd3a0"/>
+      <rect x="512" y="94" width="196" height="40" rx="8" fill="#17332b" stroke="#5fd3a0"/>
+      <rect x="512" y="142" width="196" height="40" rx="8" fill="#17332b" stroke="#5fd3a0"/>
+      <rect x="761" y="46" width="196" height="40" rx="8" fill="#2e2618" stroke="#f2b45a"/>
+      <rect x="761" y="94" width="196" height="40" rx="8" fill="#2e2618" stroke="#f2b45a"/>
+      <rect x="1010" y="46" width="196" height="40" rx="8" fill="#241f38" stroke="#b18cff"/>
+      <rect x="1010" y="94" width="196" height="40" rx="8" fill="#241f38" stroke="#b18cff"/>
+      <rect x="1010" y="142" width="196" height="40" rx="8" fill="#2a2440" stroke="#b18cff"/>
+    </g>
+    <g font-size="14">
+      <text x="26" y="71">Вопросы + sync веток</text><text x="26" y="119">План, риск low/normal/high</text>
+      <text x="26" y="167">Одобрение человеком</text>
+      <text x="275" y="71">fe-nestjs-bff · сервер</text><text x="275" y="119">fe-react · интерфейс</text>
+      <text x="524" y="71">quality-gate</text><text x="524" y="119">contract-gate</text><text x="524" y="167">security-review</text>
+      <text x="773" y="71">fe-reviewer + верификатор</text><text x="773" y="119">review-findings</text>
+      <text x="1022" y="71">Дифф + отчёты гейтов</text><text x="1022" y="119">cost-budget</text>
+      <text x="1022" y="167">Коммит — человек</text>
+    </g>
+    <g stroke="#6f7f9e" stroke-width="2" fill="none" marker-end="url(#ar4)">
+      <line x1="224" y1="110" x2="249" y2="110"/><line x1="473" y1="110" x2="498" y2="110"/>
+      <line x1="722" y1="110" x2="747" y2="110"/><line x1="971" y1="110" x2="996" y2="110"/>
+    </g>
+    <g stroke="#5fd3a0" stroke-width="1.6" fill="none" class="flowdash">
+      <line x1="112" y1="220" x2="112" y2="270"/><line x1="361" y1="220" x2="361" y2="270"/>
+      <line x1="610" y1="220" x2="610" y2="270"/><line x1="859" y1="220" x2="859" y2="270"/>
+      <line x1="1108" y1="220" x2="1108" y2="270"/>
+    </g>
+    <g>
+      <rect x="0" y="270" width="1220" height="64" rx="12" fill="#1e2739" stroke="#5fd3a0" stroke-width="1.5"/>
+    </g>
+    <text x="20" y="298" font-size="17" font-weight="700">Журнал аудита · <tspan font-family="SF Mono, Menlo, monospace" font-size="15" fill="#9aa6bd">events.jsonl</tspan></text>
+    <text x="20" y="320" class="m">одна строка — одно событие: гейты, маршрутизация, замечания, бюджет · только метаданные</text>
+  </svg>
+  <ul class="xs muted" style="margin: 6px 0 0; padding-left: 18px;">
+    <li><b>Журнал аудита</b><span class="gl">§28</span> был в jefu-tools и раньше (навык workflow-audit); новые гейты пишут в него тем же способом. <code>parentSessionId</code> склеивает события всех агентов задачи. Кода, промптов и секретов там нет.</li>
+    <li>Из него считаются бюджет<span class="gl">§30</span>, метрики ревью<span class="gl">§22</span> и сбои процесса для ретро<span class="gl">§31</span>.</li>
+  </ul>
+</section>
+
+<!-- 4. Было → стало -->
+<section class="slide">
+  <div class="kicker">Было → стало</div>
+  <h2>Изменение приходит на ревью уже проверенным</h2>
+  <div class="legend" style="margin: 6px 0 14px;"><span class="chip bad">было</span><span>→</span><span class="chip ok">стало</span></div>
+  <div class="holes" style="grid-template-columns: 1fr 40px 1fr; gap: 10px 12px;">
+    <div class="h"><div class="t">«Тесты прошли» — на слово</div></div><div class="ar">→</div>
+    <div class="f"><div class="t">Отчёт автоматических проверок<span class="gl">§13</span></div><div class="xs muted">quality-gate: lint, typecheck, test, build → PASS / FAIL / SKIPPED; SKIPPED ≠ PASS</div></div>
+    <div class="h"><div class="t">Поломка API видна на ревью</div></div><div class="ar">→</div>
+    <div class="f"><div class="t">Ловится до ревью<span class="gl">§14</span></div><div class="xs muted">contract-gate: OpenAPI против базы, вызовы SPA со спекой BFF</div></div>
+    <div class="h"><div class="t">Безопасность на глаз</div></div><div class="ar">→</div>
+    <div class="f"><div class="t">Новый код проверяется автоматически<span class="gl">§15</span></div><div class="xs muted">security-review: скан добавленных строк; для normal / high ещё проход модели</div></div>
+    <div class="h"><div class="t">Ревью по кругу</div></div><div class="ar">→</div>
+    <div class="f"><div class="t">Проверенные замечания, ответ на каждое<span class="gl">§20 §22</span></div><div class="xs muted">4 линзы fe-reviewer + независимый верификатор; review-findings ведёт журнал замечаний</div></div>
+    <div class="h"><div class="t">Стоимость не видна</div></div><div class="ar">→</div>
+    <div class="f"><div class="t">Бюджет на всю задачу<span class="gl">§30</span></div><div class="xs muted">cost-budget: low 5 / normal 15 / high 40 запросов; при превышении оркестратор спрашивает</div></div>
+  </div>
+</section>
+
+<!-- 5. Обратная связь -->
+<section class="slide">
+  <div class="kicker">Обратная связь</div>
+  <h2>Флоу учится: частые замечания становятся правилами</h2>
+  <div class="cols" style="grid-template-columns: 1.2fr 1fr; margin-top: 14px; align-items: center;">
+    <div class="card">
+      <svg viewBox="0 0 360 250">
+        <defs><marker id="ar9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#5fd3a0"/></marker></defs>
+        <circle cx="180" cy="122" r="84" fill="none" stroke="#2a3b55" stroke-width="2"/>
+        <g stroke="#5fd3a0" stroke-width="2" fill="none" class="flowdash" marker-end="url(#ar9)">
+          <path d="M228,52 A84,84 0 0 1 262,100"/><path d="M252,170 A84,84 0 0 1 206,203"/>
+          <path d="M132,192 A84,84 0 0 1 98,144"/><path d="M108,74 A84,84 0 0 1 150,43"/>
+        </g>
+        <g>
+          <rect x="130" y="14" width="100" height="34" rx="8" fill="#1e2739" stroke="#6aa8ff"/>
+          <rect x="240" y="104" width="118" height="44" rx="8" fill="#17332b" stroke="#5fd3a0"/>
+          <rect x="112" y="196" width="136" height="44" rx="8" fill="#17332b" stroke="#5fd3a0"/>
+          <rect x="2" y="100" width="108" height="44" rx="8" fill="#2e2618" stroke="#f2b45a"/>
+        </g>
+        <text x="180" y="36" text-anchor="middle" font-size="14" font-weight="600">Ревью</text>
+        <text x="299" y="123" text-anchor="middle" font-size="13" font-weight="600">Журнал</text><text x="299" y="140" text-anchor="middle" class="m" font-size="11.5">вердикт и ответ</text>
+        <text x="180" y="215" text-anchor="middle" font-size="13" font-weight="600">Отчёт</text><text x="180" y="232" text-anchor="middle" class="m" font-size="11.5">что принято</text>
+        <text x="56" y="119" text-anchor="middle" font-size="13" font-weight="600">Правило</text><text x="56" y="136" text-anchor="middle" class="m" font-size="11.5">частый повтор</text>
+      </svg>
+    </div>
+    <div class="card">
+      <h3 class="b">Устаревшие инструкции находятся сами<span class="gl">§26</span> <span class="chip ok">без модели</span></h3>
+      <p class="muted" style="margin: 6px 0 0;">instruction-freshness сверяет пути и <code>npm run</code> в инструкциях агентов с кодом. Уже нашла реальные расхождения.</p>
+      <p class="xs muted" style="margin: 10px 0 0;">Журнал замечаний<span class="gl">§22</span> считает, что подтвердилось и что исправили; категория с 3+ повторами — кандидат в правило <code>REVIEW.md</code><span class="gl">§23</span>, вносит человек. Сбои самого процесса разбирает ретро и бэклог<span class="gl">§31</span> — они были и раньше.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Что это меняет -->
+<section class="slide">
+  <div class="kicker">Итог</div>
+  <h2>Каждый получает меньше ручной работы и больше уверенности</h2>
+  <div class="cols c3 roomy" style="margin-top: 22px;">
+    <div class="card"><h3 class="g">Автор</h3><p class="muted" style="margin: 4px 0 0;">Готовые отчёты проверок вместо «тесты прошли».</p></div>
+    <div class="card"><h3 class="a">Ревьюер</h3><p class="muted" style="margin: 4px 0 0;">Только подтверждённые замечания, без повторов.</p></div>
+    <div class="card"><h3 class="v">Команда</h3><p class="muted" style="margin: 4px 0 0;">Ошибки становятся правилами, расход под контролем.</p></div>
+  </div>
+</section>
+
+<div class="progress" id="progress"></div>
+<div class="nav"><span id="count"></span><button id="prev">←</button><button id="next">→</button></div>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  let i = Math.max(0, Math.min(slides.length - 1, parseInt(location.hash.slice(1) || '1', 10) - 1));
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle('active', k === i));
+    document.getElementById('count').textContent = (i + 1) + ' / ' + slides.length;
+    document.getElementById('progress').style.width = ((i + 1) / slides.length * 100) + '%';
+    history.replaceState(null, '', '#' + (i + 1));
+  }
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); show(i - 1); }
+    if (e.key === 'Home') show(0);
+    if (e.key === 'End') show(slides.length - 1);
+  });
+  window.addEventListener('hashchange', () => {
+    const n = parseInt(location.hash.slice(1), 10);
+    if (!Number.isNaN(n) && n - 1 !== i) show(n - 1);
+  });
+  document.getElementById('prev').onclick = () => show(i - 1);
+  document.getElementById('next').onclick = () => show(i + 1);
+  show(isNaN(i) ? 0 : i);
+</script>
+</body>
+</html>
