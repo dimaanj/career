@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMN — релиз «зелёный» только когда новые поды готовы</title>
+<style>
+  :root{
+    --bg:#0f1419; --card:#171d24; --card2:#1e262f; --line:#2c3540; --txt:#e6edf3; --mut:#8b98a5;
+    --red:#f85149; --orng:#f0883e; --yel:#d29922; --grn:#3fb950; --blu:#58a6ff; --pur:#bc8cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  nav{position:sticky;top:0;z-index:10;background:rgba(15,20,25,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);
+      display:flex;gap:4px;padding:8px 24px;flex-wrap:wrap}
+  nav a{color:var(--mut);text-decoration:none;padding:4px 10px;border-radius:6px;font-size:13px}
+  nav a:hover{background:var(--card2);color:var(--txt)}
+  section{max-width:1180px;margin:0 auto;padding:40px 24px 24px;min-height:70vh;scroll-margin-top:50px}
+  h1{font-size:28px;margin:0 0 6px} h2{font-size:22px;margin:0 0 4px} h3{margin:0 0 6px;font-size:16px}
+  .sub{color:var(--mut);margin:0 0 22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g5{grid-template-columns:repeat(5,1fr)}
+  @media(max-width:900px){.g2,.g3,.g5{grid-template-columns:1fr}}
+  .pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .p-red{background:rgba(248,81,73,.15);color:var(--red)} .p-grn{background:rgba(63,185,80,.15);color:var(--grn)}
+  .p-blu{background:rgba(88,166,255,.15);color:var(--blu)} .p-yel{background:rgba(210,153,34,.15);color:var(--yel)}
+  .p-pur{background:rgba(188,140,255,.15);color:var(--pur)} .p-mut{background:var(--card2);color:var(--mut)}
+  code{background:var(--card2);padding:1px 6px;border-radius:4px;font-size:13px}
+  .big{font-size:18px}
+  .hero{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+  @media(max-width:900px){.hero{grid-template-columns:1fr}}
+  .hero .card{border-left:4px solid var(--red)} .hero .card.ok{border-left-color:var(--grn)}
+
+  /* timeline */
+  .tl{position:relative;margin-top:10px}
+  .tl-row{display:grid;grid-template-columns:170px 1fr;align-items:center;height:58px}
+  .tl-name{font-weight:600;font-size:14px}
+  .tl-track{position:relative;height:100%;border-left:1px solid var(--line)}
+  .bar{position:absolute;top:13px;height:16px;border-radius:4px}
+  .b-pull{background:repeating-linear-gradient(45deg,#2c3540 0 6px,#38434f 6px 12px)}
+  .b-up{background:var(--grn)}
+  .mk{position:absolute;top:6px;width:2px;height:30px}
+  .mk span{position:absolute;top:28px;left:-4px;font-size:11.5px;white-space:nowrap;color:var(--mut)}
+  .dot{z-index:2;position:absolute;top:12px;width:18px;height:18px;border-radius:50%;margin-left:-9px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+  .axis{display:grid;grid-template-columns:170px 1fr}
+  .axis-t{position:relative;height:20px;color:var(--mut);font-size:11px}
+  .axis-t span{position:absolute;transform:translateX(-50%)}
+  .band{position:absolute;top:0;bottom:0;background:rgba(248,81,73,.08);border-left:1px dashed var(--red);border-right:1px dashed var(--red)}
+  .band b{position:absolute;bottom:2px;left:8px;font-size:11.5px!important;color:var(--red);font-size:12px;white-space:nowrap}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;color:var(--mut);font-size:13px;margin-top:12px}
+  .legend i{display:inline-block;width:22px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+
+  /* pipeline */
+  .pipe{display:flex;flex-direction:column;gap:0}
+  .stage{display:grid;grid-template-columns:44px 210px 1fr 1fr;gap:14px;align-items:stretch;position:relative}
+  .stage .num{display:flex;flex-direction:column;align-items:center}
+  .stage .num b{width:34px;height:34px;border-radius:50%;background:var(--card2);border:2px solid var(--blu);display:flex;align-items:center;justify-content:center;font-size:14px}
+  .stage .num i{flex:1;width:2px;background:var(--line)}
+  .stage:last-child .num i{display:none}
+  .stage .what{padding:6px 0 18px}
+  .stage .what h3{font-size:15px}
+  .tool{font-size:12px;color:var(--pur);font-weight:600}
+  .col{border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:13.5px}
+  .now{background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.3)}
+  .new{background:rgba(63,185,80,.07);border:1px solid rgba(63,185,80,.3)}
+  .col .lbl{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;display:block}
+  .now .lbl{color:var(--red)} .new .lbl{color:var(--grn)}
+  .hdr{display:grid;grid-template-columns:44px 210px 1fr 1fr;gap:14px;color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+  @media(max-width:900px){.stage,.hdr{grid-template-columns:1fr}.stage .num{display:none}.hdr{display:none}}
+  .side{margin-top:10px;border-left:4px solid var(--yel)}
+
+  /* deps svg */
+  svg text{font-family:inherit}
+  .gw-flow{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
+  .gw-step{flex:1;min-width:170px;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px;position:relative}
+  .gw-step:not(:last-child)::after{content:"→";position:absolute;right:-17px;top:40%;color:var(--mut);font-size:18px}
+  .gw-step h3{font-size:14px}
+  .gw-step p{margin:0;font-size:13px;color:var(--mut)}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  .phase{border-top:4px solid var(--blu)}
+  .phase .n{color:var(--blu);font-weight:700;font-size:12px;letter-spacing:.06em}
+  .phase ul{margin:8px 0 0;padding-left:18px;font-size:13.5px} .phase li{margin:3px 0}
+  .phase .repos{margin-top:10px;font-size:12px;color:var(--mut)}
+  .q{display:flex;gap:12px;align-items:flex-start}
+  .q .who{min-width:150px}
+  footer{color:var(--mut);font-size:12px;text-align:center;padding:30px}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#goal">Цель</a>
+  <a href="#incident">Инцидент 24.11</a>
+  <a href="#deps">Кто кого вызывает</a>
+  <a href="#pipeline">Этапы релиза</a>
+  <a href="#gateway">Gateway</a>
+  <a href="#map">Проблема → решение</a>
+  <a href="#phases">Фазы работ</a>
+  <a href="#questions">Вопросы</a>
+</nav>
+
+<!-- 0. GOAL -->
+<section id="goal">
+  <h1>Релиз «зелёный» только когда все новые поды реально готовы</h1>
+  <p class="sub">smn-spiderman · Argo CD · все сервисы SMN</p>
+  <div class="hero">
+    <div class="card">
+      <h3>Сейчас</h3>
+      <p class="big">Argo CD показывает <span class="pill p-grn">Healthy</span>, а логин отдаёт <span class="pill p-red">404</span> на otp/settings, пока руками не перезапустишь api-gateway.</p>
+      <p style="color:var(--mut);margin:0">«Healthy» сейчас значит «процесс отвечает на <code>/actuator/health</code>», а не «сервис может обслуживать запросы».</p>
+    </div>
+    <div class="card ok">
+      <h3>Хотим</h3>
+      <p class="big">Под получает трафик, а приложение становится Healthy, только когда новая версия <b>реально готова</b>: БД/Redis доступны, а у gateway загружены маршруты критичных сервисов.</p>
+      <p style="color:var(--mut);margin:0">Медленный старт не убивается liveness. Hook <code>test-connection</code> ловит неготовность и не блокирует следующий sync.</p>
+    </div>
+  </div>
+  <div class="grid g3" style="margin-top:14px">
+    <div class="card"><span class="pill p-blu">Главный рычаг</span><h3 style="margin-top:8px">Правильные пробы</h3><p style="margin:0;color:var(--mut)">startup + readiness + liveness через Actuator probe-группы. Всё остальное на них опирается.</p></div>
+    <div class="card"><span class="pill p-pur">Gateway</span><h3 style="margin-top:8px">Readiness ждёт маршруты</h3><p style="margin:0;color:var(--mut)">Ждёт только критичные: otp-validator, settings, user-profile, support-panel (+ prof-events?). Refresh 5 мин → 30 с.</p></div>
+    <div class="card"><span class="pill p-yel">Страховка</span><h3 style="margin-top:8px">Порядок + проверка</h3><p style="margin:0;color:var(--mut)">gateway в волне после upstream-сервисов. test-connection: <code>curl --fail</code>, без kubectl.</p></div>
+  </div>
+</section>
+
+<!-- 1. INCIDENT -->
+<section id="incident">
+  <h2>Что произошло 24.11 (UTC)</h2>
+  <p class="sub">Gateway стал Healthy почти одновременно с otp/settings, но маршрутов к ним не было до ручного рестарта</p>
+  <div class="card">
+    <!-- scale: 12:49 .. 13:06 = 17 min; pos = (t-12:49)/17*100 -->
+    <div class="axis"><div></div>
+      <div class="axis-t">
+        <span style="left:5.9%">12:50</span><span style="left:35.3%">12:55</span><span style="left:64.7%">13:00</span><span style="left:94.1%">13:05</span>
+      </div>
+    </div>
+    <div class="tl">
+      <div class="tl-row"><div class="tl-name">api-gateway</div>
+        <div class="tl-track">
+          <div class="band" style="left:42.7%;width:40%"><b>логин → 404 на otp/settings</b></div>
+          <div class="bar b-pull" style="left:7.1%;width:35.6%"></div>
+          <div class="bar b-up" style="left:42.7%;width:40%;opacity:.35"></div>
+          <div class="dot" style="left:7.1%;background:var(--blu)">S</div>
+          <div class="dot" style="left:42.7%;background:var(--grn);color:#000">H</div>
+          <div class="dot" style="left:82.3%;background:var(--orng);color:#000">⟳</div>
+          <div class="bar b-up" style="left:82.3%;width:17%"></div>
+        </div></div>
+      <div class="tl-row"><div class="tl-name">otp-validator</div>
+        <div class="tl-track"><div class="bar b-pull" style="left:7.1%;width:34%"></div><div class="bar b-up" style="left:41.1%;width:58%"></div>
+          <div class="dot" style="left:41.1%;background:var(--grn);color:#000">R</div></div></div>
+      <div class="tl-row"><div class="tl-name">settings</div>
+        <div class="tl-track"><div class="bar b-pull" style="left:7.1%;width:34.9%"></div><div class="bar b-up" style="left:42%;width:57%"></div>
+          <div class="dot" style="left:42%;background:var(--grn);color:#000">R</div></div></div>
+      <div class="tl-row"><div class="tl-name">recommendations</div>
+        <div class="tl-track"><div class="bar b-pull" style="left:7.1%;width:39.6%"></div><div class="bar b-up" style="left:46.7%;width:6.2%;opacity:.35"></div>
+          <div class="dot" style="left:46.7%;background:var(--blu)">▶</div>
+          <div class="dot" style="left:52.9%;background:var(--red)">✕</div>
+          <div class="bar b-up" style="left:57%;width:42%"></div>
+          <div class="dot" style="left:57%;background:var(--grn);color:#000">R</div>
+          <div class="mk" style="left:99%;border:0"><span style="color:var(--red);left:auto;right:0">12:58:00 убит liveness: старт 65,8 с &gt; окно ~60 с</span></div></div></div>
+      <div class="tl-row"><div class="tl-name">kc-crm-sync</div>
+        <div class="tl-track"><div class="bar b-pull" style="left:7.1%;width:44.2%"></div>
+          <div class="dot" style="left:51.3%;background:var(--red)">F</div>
+          <div class="dot" style="left:64.4%;background:var(--orng);color:#000">D</div>
+          <div class="bar b-up" style="left:52.4%;width:47%;opacity:.5"></div>
+          <div class="mk" style="left:64.4%"><span style="color:var(--orng);left:auto;right:-4px">12:59:57 hook-под удалён руками → sync заново</span></div></div></div>
+    </div>
+    <div class="legend">
+      <span><i class="b-pull"></i>раскатка: в основном очередь pull образов 4–10 мин</span>
+      <span><i style="background:var(--grn)"></i>под Ready</span>
+      <span><b style="color:var(--blu)">S</b> sync · <b style="color:var(--blu)">▶</b> старт контейнера · <b style="color:var(--grn)">H</b> Healthy · <b style="color:var(--grn)">R</b> Ready · <b style="color:var(--red)">F</b> sync Failed · <b style="color:var(--orng)">D</b> ручное удаление hook · <b style="color:var(--orng)">⟳</b> ручной рестарт gateway</span>
+    </div>
+  </div>
+  <div class="grid g3" style="margin-top:14px">
+    <div class="card"><span class="pill p-red">Гипотеза H1</span><p style="margin:8px 0 0">Gateway забрал <code>openapi.yaml</code> у otp/settings в момент их переката: получил ошибку или <b>старую</b> спецификацию. Следующая попытка была только через 5 мин, а рестарт случился раньше.</p></div>
+    <div class="card"><span class="pill p-yel">recommendations · подтверждено логами</span><p style="margin:8px 0 0">Перезапущен liveness-пробой во время <b>холодного старта</b>: <code>Started in 65,8 s</code>, а окно liveness ≈ 60 с (<code>initialDelay 30</code> + 3 × <code>period 10</code>). Пробы падали с <code>connection refused</code>: порт ещё не был открыт. <code>startupProbe</code> в чарте нет.</p>
+      <p style="margin:6px 0 0;color:var(--mut);font-size:13px">Остальные старты ≈ 19 с. Медленным был только холодный старт после pull на нагруженной ноде (CPU/диск не доказаны). <code>timeoutSeconds: 1</code> ни при чём: ошибок <code>deadline exceeded</code> нет.</p></div>
+    <div class="card"><span class="pill p-yel">kc-crm-sync</span><p style="margin:8px 0 0">Hook без <code>BeforeHookCreation</code>: старый под с тем же именем мешает следующему sync. Плюс <code>curl</code> без <code>--fail</code>.</p></div>
+  </div>
+</section>
+
+<!-- 2. DEPS -->
+<section id="deps">
+  <h2>Кто кого вызывает через api-gateway</h2>
+  <p class="sub">Красным отмечены критичные сервисы: без их маршрутов gateway не должен считаться Ready</p>
+  <div class="card">
+    <svg viewBox="0 0 920 430" width="100%" role="img" aria-label="dependency diagram">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#8b98a5"/></marker>
+        <marker id="arR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#f85149"/></marker>
+      </defs>
+      <text x="20" y="18" fill="#8b98a5" font-size="12">КТО ВЫЗЫВАЕТ</text>
+      <text x="370" y="18" fill="#8b98a5" font-size="12">ШЛЮЗ</text>
+      <text x="690" y="18" fill="#8b98a5" font-size="12">UPSTREAM (openapi.yaml → маршруты)</text>
+      <!-- callers -->
+      <g font-size="13" fill="#e6edf3">
+        <rect x="20" y="40"  width="230" height="46" rx="8" fill="#1e262f" stroke="#f85149"/><text x="32" y="60">Keycloak</text><text x="32" y="77" fill="#8b98a5" font-size="11">логин: OTP + contact-validations</text>
+        <rect x="20" y="105" width="230" height="46" rx="8" fill="#1e262f" stroke="#2c3540"/><text x="32" y="125">Публичный ingress ЛК</text><text x="32" y="142" fill="#8b98a5" font-size="11">/otp  /api  /prof-events  /anketa</text>
+        <rect x="20" y="170" width="230" height="46" rx="8" fill="#1e262f" stroke="#2c3540"/><text x="32" y="190">user-profile BFF</text><text x="32" y="207" fill="#8b98a5" font-size="11">otp, settings</text>
+        <rect x="20" y="235" width="230" height="46" rx="8" fill="#1e262f" stroke="#2c3540"/><text x="32" y="255">support-panel BFF</text><text x="32" y="272" fill="#8b98a5" font-size="11">support-panel/v1/*, settings</text>
+        <rect x="20" y="300" width="230" height="46" rx="8" fill="#1e262f" stroke="#2c3540"/><text x="32" y="320">otp-validator</text><text x="32" y="337" fill="#8b98a5" font-size="11">settings</text>
+      </g>
+      <g stroke="#8b98a5" stroke-width="1.4" fill="none" marker-end="url(#ar)">
+        <path d="M250,63 C310,63 310,200 368,200" stroke="#f85149" stroke-width="2.2" marker-end="url(#arR)"/>
+        <path d="M250,128 C310,128 310,205 368,205"/>
+        <path d="M250,193 C310,193 310,210 368,210"/>
+        <path d="M250,258 C310,258 310,215 368,215"/>
+        <path d="M250,323 C310,323 310,220 368,220"/>
+      </g>
+      <!-- gateway -->
+      <rect x="370" y="160" width="190" height="96" rx="12" fill="#1e262f" stroke="#bc8cff" stroke-width="2"/>
+      <text x="465" y="192" fill="#e6edf3" font-size="16" font-weight="700" text-anchor="middle">api-gateway</text>
+      <text x="465" y="212" fill="#8b98a5" font-size="11" text-anchor="middle">Spring Cloud Gateway</text>
+      <text x="465" y="230" fill="#8b98a5" font-size="11" text-anchor="middle">маршруты = из openapi.yaml</text>
+      <text x="465" y="246" fill="#bc8cff" font-size="11" text-anchor="middle">refresh: 5 мин → 30 с</text>
+      <!-- upstreams -->
+      <g font-size="13">
+        <g fill="#e6edf3">
+          <rect x="690" y="35"  width="210" height="34" rx="7" fill="rgba(248,81,73,.12)" stroke="#f85149"/><text x="702" y="57">otp-validator</text>
+          <rect x="690" y="77"  width="210" height="34" rx="7" fill="rgba(248,81,73,.12)" stroke="#f85149"/><text x="702" y="99">settings</text>
+          <rect x="690" y="119" width="210" height="34" rx="7" fill="rgba(248,81,73,.12)" stroke="#f85149"/><text x="702" y="141">user-profile</text>
+          <rect x="690" y="161" width="210" height="34" rx="7" fill="rgba(248,81,73,.12)" stroke="#f85149"/><text x="702" y="183">support-panel</text>
+          <rect x="690" y="203" width="210" height="34" rx="7" fill="rgba(210,153,34,.12)" stroke="#d29922" stroke-dasharray="5 3"/><text x="702" y="225">prof-events</text>
+          <rect x="690" y="245" width="210" height="34" rx="7" fill="#1e262f" stroke="#2c3540"/><text x="702" y="267">anketolog</text>
+          <rect x="690" y="287" width="210" height="34" rx="7" fill="#1e262f" stroke="#2c3540"/><text x="702" y="309">offline-events</text>
+          <rect x="690" y="329" width="210" height="34" rx="7" fill="#1e262f" stroke="#2c3540"/><text x="702" y="351">offline-events-reports</text>
+          <rect x="690" y="371" width="210" height="34" rx="7" fill="#1e262f" stroke="#2c3540"/><text x="702" y="393">recommendations</text>
+        </g>
+        <g font-size="11" font-weight="700">
+          <text x="890" y="57" fill="#f85149" text-anchor="end">КРИТ</text><text x="890" y="99" fill="#f85149" text-anchor="end">КРИТ</text>
+          <text x="890" y="141" fill="#f85149" text-anchor="end">КРИТ</text><text x="890" y="183" fill="#f85149" text-anchor="end">КРИТ</text>
+          <text x="890" y="225" fill="#d29922" text-anchor="end">РЕКОМЕНД.</text>
+        </g>
+      </g>
+      <g fill="none" stroke-width="1.4">
+        <path d="M560,190 C630,190 630,52 688,52"   stroke="#f85149" stroke-width="2.2" marker-end="url(#arR)"/>
+        <path d="M560,195 C630,195 630,94 688,94"   stroke="#f85149" stroke-width="2.2" marker-end="url(#arR)"/>
+        <path d="M560,200 C630,200 630,136 688,136" stroke="#f85149" stroke-width="2.2" marker-end="url(#arR)"/>
+        <path d="M560,205 C630,205 630,178 688,178" stroke="#f85149" stroke-width="2.2" marker-end="url(#arR)"/>
+        <path d="M560,212 C630,212 630,220 688,220" stroke="#d29922" stroke-dasharray="5 3" marker-end="url(#ar)"/>
+        <path d="M560,218 C630,218 630,262 688,262" stroke="#8b98a5" marker-end="url(#ar)"/>
+        <path d="M560,224 C630,224 630,304 688,304" stroke="#8b98a5" marker-end="url(#ar)"/>
+        <path d="M560,230 C630,230 630,346 688,346" stroke="#8b98a5" marker-end="url(#ar)"/>
+        <path d="M560,236 C630,236 630,388 688,388" stroke="#8b98a5" stroke-dasharray="2 4" marker-end="url(#ar)"/>
+      </g>
+      <text x="690" y="422" fill="#8b98a5" font-size="11">BFF ходят в recommendations напрямую</text>
+    </svg>
+  </div>
+</section>
+
+<!-- 3. PIPELINE -->
+<section id="pipeline">
+  <h2>Этапы релиза: что срабатывает и что меняем</h2>
+  <p class="sub">Путь одного сервиса от sync в Argo CD до «зелёного». Слева этап и инструмент, справа «сейчас» и «будет»</p>
+  <div class="hdr"><div></div><div>Этап · инструмент</div><div>Сейчас</div><div>Будет</div></div>
+  <div class="pipe">
+
+    <div class="stage"><div class="num"><b>1</b><i></i></div>
+      <div class="what"><h3>Sync приложения</h3><div class="tool">Argo CD · sync-wave</div></div>
+      <div class="col now"><span class="lbl">Сейчас</span>api-gateway в волне <b>0</b>, раньше всех upstream-сервисов (settings 10, otp 30). Проверки здоровья у <code>Application</code> в prod, похоже, нет: волны только задают порядок старта.</div>
+      <div class="col new"><span class="lbl">Будет</span>Upstream-сервисы в волнах ≤30, gateway в волне <b>35</b>. Просим платформу включить health check для <code>Application</code>. Gateway не должен зависеть от этого (см. шаг 4).</div>
+    </div>
+
+    <div class="stage"><div class="num"><b>2</b><i></i></div>
+      <div class="what"><h3>Планирование + pull образа</h3><div class="tool">kube-scheduler · kubelet</div></div>
+      <div class="col now"><span class="lbl">Сейчас</span>Очередь pull на ноде 4–10 мин. Пробы в это время не работают: они начинаются только после старта контейнера.</div>
+      <div class="col new"><span class="lbl">Будет</span>Отдельный тикет платформе: параллельный pull и кэш/зеркало. На пробы не влияет.</div>
+    </div>
+
+    <div class="stage"><div class="num"><b>3</b><i></i></div>
+      <div class="what"><h3>Старт приложения</h3><div class="tool">kubelet → startupProbe</div></div>
+      <div class="col now"><span class="lbl">Сейчас</span><code>startupProbe</code> нет. Окно liveness ≈ 60 с (<code>initialDelay 30</code> + 3 × 10 с) короче холодного старта: recommendations стартовал 65,8 с и был убит.</div>
+      <div class="col new"><span class="lbl">Будет</span><code>startupProbe</code> → <code>/actuator/health/liveness</code>, 5 с × 36 = <b>до 180 с</b> на старт. Пока она не прошла, liveness и readiness не запускаются.</div>
+    </div>
+
+    <div class="stage"><div class="num"><b>4</b><i></i></div>
+      <div class="what"><h3>Готов принимать трафик?</h3><div class="tool">kubelet → readinessProbe</div></div>
+      <div class="col now"><span class="lbl">Сейчас</span><code>/actuator/health</code>, общий статус. У gateway он <b>не знает про маршруты</b>: Ready даже без маршрутов к otp/settings.</div>
+      <div class="col new"><span class="lbl">Будет</span><code>/actuator/health/readiness</code> = <code>readinessState</code> + критичные зависимости: <code>db</code> (JPA), <code>redis</code> (otp, gateway). У gateway добавляется <b><code>openApiRoutes</code></b>: маршруты критичных сервисов загружены.</div>
+    </div>
+
+    <div class="stage"><div class="num"><b>5</b><i></i></div>
+      <div class="what"><h3>Переключение трафика</h3><div class="tool">Service endpoints · RollingUpdate</div></div>
+      <div class="col now"><span class="lbl">Сейчас</span>Механика правильная: в Service только Ready-поды (<code>publishNotReadyAddresses=false</code>), maxSurge 1 / maxUnavailable 0. Но «Ready» ничего не гарантирует (шаг 4).</div>
+      <div class="col new"><span class="lbl">Будет</span>То же, но новый под попадает в Service только когда действительно готов. До этого трафик обслуживает <b>старый</b> под.</div>
+    </div>
+
+    <div class="stage"><div class="num"><b>6</b><i></i></div>
+      <div class="what"><h3>Deployment Healthy</h3><div class="tool">Argo CD · встроенный health Deployment</div></div>
+      <div class="col now"><span class="lbl">Сейчас</span>Argo ждёт окончания раскатки: все реплики новой ревизии Ready. Healthy наступает рано, потому что readiness слабая.</div>
+      <div class="col new"><span class="lbl">Будет</span>Без изменений в Argo: Healthy автоматически станет означать «все <b>новые</b> поды реально готовы».</div>
+    </div>
+
+    <div class="stage"><div class="num"><b>7</b><i></i></div>
+      <div class="what"><h3>Контрольная проверка</h3><div class="tool">PostSync hook · test-connection</div></div>
+      <div class="col now"><span class="lbl">Сейчас</span><code>nc</code> по TCP или <code>curl</code> без <code>--fail</code> (проходит на 503). Нет <code>BeforeHookCreation</code>: упавший под блокирует следующий sync (kc-crm-sync).</div>
+      <div class="col new"><span class="lbl">Будет</span><code>curl --fail --retry</code> на <code>/actuator/health/readiness</code> через Service. Hook запускается после шага 6, значит в Service уже только новые поды, <b>kubectl не нужен</b>. Для gateway ещё проверка <code>/actuator/gateway/routes</code>. Политика <code>BeforeHookCreation,HookSucceeded</code>.</div>
+    </div>
+
+    <div class="stage"><div class="num"><b style="border-color:var(--grn);color:var(--grn)">✓</b><i></i></div>
+      <div class="what"><h3>Приложение зелёное</h3><div class="tool">Argo CD · Synced + Healthy</div></div>
+      <div class="col new" style="grid-column:span 2"><span class="lbl">Результат</span>Зелёный = все новые поды Ready по честной readiness, hook прошёл. Родитель <code>smn-spiderman</code> честно зелёный, только если платформа включит health check для <code>Application</code>.</div>
+    </div>
+  </div>
+
+  <div class="card side">
+    <h3>Постоянно после старта · livenessProbe</h3>
+    <p style="margin:0"><code>/actuator/health/liveness</code>, timeout 3 с. Проверяет только «процесс жив», <b>без БД, Redis и маршрутов</b>: падение зависимости не должно рестартить поды, только выводить их из трафика (readiness).</p>
+  </div>
+</section>
+
+<!-- 4. GATEWAY -->
+<section id="gateway">
+  <h2>api-gateway: как будет работать старт</h2>
+  <p class="sub">Шаг 4 этапов релиза, развёрнутый для gateway</p>
+  <div class="gw-flow">
+    <div class="gw-step"><h3>1. Под стартовал</h3><p>startupProbe OK (liveness)</p></div>
+    <div class="gw-step"><h3>2. Тянет openapi.yaml</h3><p>у 9 сервисов, с connect/read таймаутом, повтор каждые <b>30 с</b> (было 5 мин)</p></div>
+    <div class="gw-step" style="border-color:var(--red)"><h3>3. Критичные загружены?</h3><p>otp-validator, settings, user-profile, support-panel (+ prof-events). Нет → readiness <b style="color:var(--red)">DOWN</b>, трафик идёт в старый под</p></div>
+    <div class="gw-step" style="border-color:var(--grn)"><h3>4. Ready</h3><p>под в Service. Некритичные дотянутся следующим refresh, не блокируют</p></div>
+    <div class="gw-step"><h3>5. PostSync</h3><p><code>/actuator/gateway/routes</code> содержит маршруты всех критичных сервисов, иначе hook падает</p></div>
+  </div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><span class="pill p-yel">Риск</span><p style="margin:8px 0 0">Критичный сервис лежит во время релиза: новый gateway не станет Ready, старый продолжит работать, раскатка упрётся в <code>progressDeadlineSeconds</code>. Это лучше, чем 404, но нужен алерт.</p></div>
+    <div class="card"><span class="pill p-yel">Решить</span><p style="margin:8px 0 0">Критичный сервис упал <b>после</b> релиза: маршруты удаляются через 15 мин, и gateway становится NotReady целиком. Варианты: readiness проверяет «хотя бы раз загружено» или увеличить таймаут удаления.</p></div>
+  </div>
+</section>
+
+<!-- 5. MAP -->
+<section id="map">
+  <h2>Проблема → причина → что чинит</h2>
+  <p class="sub">&nbsp;</p>
+  <div class="card">
+    <table>
+      <tr><th>Симптом 24.11</th><th>Причина</th><th>Что чинит</th></tr>
+      <tr><td>404 на otp/settings после релиза, нужен рестарт gateway</td><td>Gateway Ready без маршрутов; refresh 5 мин; синхронизация раньше upstream-сервисов</td><td><span class="pill p-pur">Фаза 2</span> <span class="pill p-blu">Фаза 3</span></td></tr>
+      <tr><td>recommendations убит при старте</td><td>Окно liveness ~60 с &lt; холодный старт 65,8 с; нет startupProbe</td><td><span class="pill p-blu">Фаза 1</span></td></tr>
+      <tr><td>kc-crm-sync: sync Failed, ручное удаление пода</td><td>Hook без <code>BeforeHookCreation</code>, <code>curl</code> без <code>--fail</code></td><td><span class="pill p-blu">Фаза 4</span></td></tr>
+      <tr><td>Argo «Healthy», а сервис не работает</td><td>readiness = общий <code>/actuator/health</code></td><td><span class="pill p-blu">Фаза 1</span> <span class="pill p-pur">Фаза 2</span></td></tr>
+      <tr><td>Релиз идёт 10+ минут</td><td>Очередь pull образов на ноде</td><td><span class="pill p-mut">Фаза 5 (платформа)</span></td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 6. PHASES -->
+<section id="phases">
+  <h2>Фазы работ</h2>
+  <p class="sub">Порядок важен: фазы 2–4 опираются на пробы из фазы 1</p>
+  <div class="grid g5">
+    <div class="card phase"><div class="n">ФАЗА 1</div><h3>Пробы во всех сервисах</h3>
+      <ul><li><code>management.endpoint.health.probes.enabled</code></li><li>readiness-группа: <code>db</code> / <code>redis</code></li><li>Helm: startup / readiness / liveness, <code>timeoutSeconds</code></li><li>Quarkus и Nest: только startupProbe + таймауты</li></ul>
+      <div class="repos">13 Spring-сервисов (gateway, otp, settings, recommendations, email-sender, anketolog, mailhog-relay, *-sync), 3 Quarkus, 2 Nest</div></div>
+    <div class="card phase" style="border-top-color:var(--pur)"><div class="n" style="color:var(--pur)">ФАЗА 2</div><h3>Gateway</h3>
+      <ul><li>refresh 30 с, таймауты fetch</li><li>HealthIndicator <code>openApiRoutes</code> в readiness</li><li>список критичных в Helm</li></ul>
+      <div class="repos">smn-api-gateway, smn-spiderman</div></div>
+    <div class="card phase"><div class="n">ФАЗА 3</div><h3>Sync-waves</h3>
+      <ul><li>upstream-сервисы ≤30, gateway 35</li><li>явные волны у *-sync</li><li>платформа: health check для <code>Application</code></li></ul>
+      <div class="repos">smn-spiderman · платформа Argo CD</div></div>
+    <div class="card phase"><div class="n">ФАЗА 4</div><h3>test-connection</h3>
+      <ul><li><code>curl --fail --retry</code> на readiness</li><li><code>BeforeHookCreation,HookSucceeded</code></li><li>новый hook у gateway (routes)</li><li>без kubectl</li></ul>
+      <div class="repos">otp, settings, recommendations, kc-crm-sync, webinar-rc-sync, support-panel(-web), api-gateway</div></div>
+    <div class="card phase" style="border-top-color:var(--mut)"><div class="n" style="color:var(--mut)">ФАЗА 5</div><h3>Pull образов</h3>
+      <ul><li>замерить pull по нодам</li><li>параллельный pull, зеркало</li></ul>
+      <div class="repos">отдельный тикет · платформа</div></div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h3>Как проверим (критерии приёмки)</h3>
+    <table>
+      <tr><td>☐</td><td>Релиз с одновременным обновлением gateway + otp + settings: логин работает <b>без рестарта</b>.</td></tr>
+      <tr><td>☐</td><td>Gateway readiness DOWN, пока нет маршрутов любого критичного сервиса. Некритичные на readiness не влияют.</td></tr>
+      <tr><td>☐</td><td>Сервис со стартом &gt;60 с: <code>restartCount = 0</code>.</td></tr>
+      <tr><td>☐</td><td>test-connection падает на не-2xx; упавший hook не блокирует следующий sync.</td></tr>
+      <tr><td>☐</td><td><code>helm template</code> smn-spiderman: волны upstream-сервисов &lt; волны gateway.</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- 7. QUESTIONS -->
+<section id="questions" style="min-height:auto">
+  <h2>Открытые вопросы</h2>
+  <p class="sub">&nbsp;</p>
+  <div class="grid" style="gap:10px">
+    <div class="card q"><div class="who"><span class="pill p-yel">Платформа</span></div><div>Есть ли в prod Argo CD (<code>vruip-infra-prod-k8s</code>, ns <code>argocd</code>) <code>resource.customizations.health.argoproj.io_Application</code>? Доступа проверить нет. Хронология 24.11 говорит, что нет.</div></div>
+    <div class="card q"><div class="who"><span class="pill p-blu">Мы</span></div><div>Включать ли <code>prof-events</code> (публичный <code>/prof-events</code>) и <code>anketolog</code> (<code>/anketa</code>) в критичные?</div></div>
+    <div class="card q"><div class="who"><span class="pill p-blu">Мы</span></div><div>Readiness gateway после релиза: «маршруты есть сейчас» или «хотя бы раз загружены»? Влияет на поведение при падении upstream-сервиса.</div></div>
+    <div class="card q"><div class="who"><span class="pill p-mut">Проверка H1</span></div><div>Были ли новые эндпоинты otp/settings в релизе? Посмотреть логи gateway 12:50–13:04: <code>Error while retrieving…</code> / <code>Got new list of N operations</code>.</div></div>
+  </div>
+</section>
+
+<footer>Подробности и ссылки на файлы: <a href="release-readiness-task.md" style="color:var(--blu)">release-readiness-task.md</a></footer>
+</body>
+</html>
