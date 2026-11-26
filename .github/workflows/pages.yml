@@ -26,7 +26,7 @@ jobs:
       - name: Collect presentations only
         run: |
           mkdir _site
-          cp index.html ai-fe-bff-flow-presentation.html jefu-tools-changes-visual.html local-run-visual.html release-readiness-visual.html release-readiness-visual-en.html _site/
+          cp index.html jefu-tools-changes-visual.html local-run-visual.html release-readiness-visual.html _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
